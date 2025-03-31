@@ -17,14 +17,11 @@ if not API_key:
 app = FastAPI()
 
 # Configure CORS
-origins = [
-    "http://localhost:5173/",
-    "https://ai-code-generator-tau.vercel.app/",  # Add your frontend URL
-]
+ 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["http://localhost:5173", "https://ai-code-generator-tau.vercel.app"],  # Remove trailing slash
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
