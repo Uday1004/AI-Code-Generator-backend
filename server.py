@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi import HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
@@ -9,6 +10,9 @@ import uvicorn
 # Load environment variables
 load_dotenv()
 API_key = os.getenv("API_KEY")
+if API_key:
+    API_key = API_key.strip().strip('"').strip("'")
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip().strip('"').strip("'")
 
 if not API_key:
     raise ValueError("API_KEY is not set in .env file")
@@ -21,7 +25,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://ai-code-generator-tau.vercel.app"],  # Remove trailing slash
+    allow_origins=["https://ai-code-generator-tau.vercel.app"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,7 +34,7 @@ app.add_middleware(
 
 # Configure GenAI
 genai.configure(api_key=API_key)
-model = genai.GenerativeModel("gemini-1.5-pro")
+model = genai.GenerativeModel(MODEL_NAME)
 
 # Pydantic model for request
 class PromptRequest(BaseModel):
@@ -46,7 +51,10 @@ SYSTEM_CONTEXT = (
 @app.post("/prompt")
 async def get_prompt(prompt_request: PromptRequest):
     final_prompt = f"{SYSTEM_CONTEXT}\n\n{prompt_request.prompt}"
-    response = model.generate_content(final_prompt)
+    try:
+        response = model.generate_content(final_prompt)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini request failed: {exc}")
 
     if not response.candidates or not response.candidates[0].content.parts:
         return {"error": "No valid response generated. Modify your prompt."}
@@ -55,4 +63,4 @@ async def get_prompt(prompt_request: PromptRequest):
 
 # Run the app
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8010)
